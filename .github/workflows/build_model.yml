@@ -18,23 +18,27 @@ jobs:
 
       - name: Validate secrets
         run: |
-          if [ -z "${{ secrets.PROJECT_ID }}" ]; then
+          if [ -z "$PROJECT_ID" ]; then
             echo "ERROR: PROJECT_ID secret is not set"
             exit 1
           fi
-          if [ -z "${{ secrets.API_KEY }}" ]; then
+          if [ -z "$API_KEY" ]; then
             echo "ERROR: API_KEY secret is not set"
             exit 1
           fi
           echo "Secrets validated successfully"
+        env:
+          PROJECT_ID: ${{ secrets.PROJECT_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
 
       - name: Build Edge Impulse Model
         uses: edgeimpulse/build-deploy@v2.0.0
-        id: build
+        id: build-deploy
         with:
           project_id: ${{ secrets.PROJECT_ID }}
           api_key: ${{ secrets.API_KEY }}
           deployment_type: "zip"
+        continue-on-error: false
 
       - name: List generated files
         run: |
@@ -44,10 +48,10 @@ jobs:
       - name: Extract deployment
         if: success()
         run: |
-          if [ -f "${{ steps.build.outputs.deployment_file_name }}" ]; then
+          if [ -f "${{ steps.build-deploy.outputs.deployment_file_name }}" ]; then
             echo "Extracting deployment..."
             mkdir -p temp
-            unzip -q "${{ steps.build.outputs.deployment_file_name }}" -d temp
+            unzip -q "${{ steps.build-deploy.outputs.deployment_file_name }}" -d temp
             # Move components to project structure
             mkdir -p libs src models
             if [ -d "temp/edge-impulse-sdk" ]; then
@@ -60,7 +64,7 @@ jobs:
               mv temp/tflite-model/* models/ 2>/dev/null || true
             fi
             # Clean up
-            rm -rf temp "${{ steps.build.outputs.deployment_file_name }}"
+            rm -rf temp "${{ steps.build-deploy.outputs.deployment_file_name }}"
           else
             echo "No deployment file found"
             ls -la

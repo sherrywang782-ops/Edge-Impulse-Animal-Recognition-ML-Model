@@ -149,6 +149,12 @@ export API_KEY="your_api_key"
 
 ### Common Issues
 
+**Workflow fails during "Validate secrets" step**
+
+- Ensure both `PROJECT_ID` and `API_KEY` secrets are set in your GitHub repository
+- Check that the secrets are named exactly `PROJECT_ID` and `API_KEY` (case-sensitive)
+- Verify the secrets have the correct values from your Edge Impulse project
+
 **Workflow fails with "Invalid API key"**
 
 - Verify your `API_KEY` secret is correctly set in GitHub
