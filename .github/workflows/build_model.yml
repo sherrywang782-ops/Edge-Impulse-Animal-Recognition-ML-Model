@@ -29,7 +29,7 @@ jobs:
           echo "Secrets validated successfully"
 
       - name: Build Edge Impulse Model
-        uses: edgeimpulse/build-deploy@v2
+        uses: edgeimpulse/build-deploy@v2.0.0
         id: build
         with:
           project_id: ${{ secrets.PROJECT_ID }}
