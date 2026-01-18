@@ -1,0 +1,82 @@
+name: Build and Deploy Edge Impulse Model
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.PROJECT_ID }}" ]; then
+            echo "ERROR: PROJECT_ID secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.API_KEY }}" ]; then
+            echo "ERROR: API_KEY secret is not set"
+            exit 1
+          fi
+          echo "Secrets validated successfully"
+
+      - name: Build Edge Impulse Model
+        uses: edgeimpulse/build-deploy@v2
+        id: build
+        with:
+          project_id: ${{ secrets.PROJECT_ID }}
+          api_key: ${{ secrets.API_KEY }}
+          deployment_type: "zip"
+
+      - name: List generated files
+        run: |
+          echo "Generated files:"
+          ls -la
+
+      - name: Extract deployment
+        if: success()
+        run: |
+          if [ -f "${{ steps.build.outputs.deployment_file_name }}" ]; then
+            echo "Extracting deployment..."
+            mkdir -p temp
+            unzip -q "${{ steps.build.outputs.deployment_file_name }}" -d temp
+            # Move components to project structure
+            mkdir -p libs src models
+            if [ -d "temp/edge-impulse-sdk" ]; then
+              mv temp/edge-impulse-sdk libs/
+            fi
+            if [ -d "temp/model-parameters" ]; then
+              mv temp/model-parameters src/
+            fi
+            if [ -d "temp/tflite-model" ]; then
+              mv temp/tflite-model/* models/ 2>/dev/null || true
+            fi
+            # Clean up
+            rm -rf temp "${{ steps.build.outputs.deployment_file_name }}"
+          else
+            echo "No deployment file found"
+            ls -la
+          fi
+
+      - name: Update version file
+        run: |
+          echo "Build Date: $(date)" > version.txt
+          echo "Commit: ${{ github.sha }}" >> version.txt
+          echo "Project ID: ${{ secrets.PROJECT_ID }}" >> version.txt
+
+      - name: Commit generated files
+        if: github.event_name == 'push'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add -f libs/ src/ models/ version.txt || true
+          git commit -m "Auto-build: Update Edge Impulse model [skip ci]" || echo "No changes to commit"
+          git push
