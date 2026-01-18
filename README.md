@@ -59,7 +59,15 @@ Before using this project, you'll need:
    - `PROJECT_ID`: Paste your Edge Impulse project ID
    - `API_KEY`: Paste your Edge Impulse API key
 
-### 4. Trigger Build
+### 4. Enable Workflow Permissions (Important!)
+
+The workflow needs permission to push changes back to your repository. Make sure your repository allows GitHub Actions to write to it:
+
+1. Go to your GitHub repository
+2. Navigate to **Settings** → **Actions** → **General**
+3. Under "Workflow permissions", select **Read and write permissions**
+
+### 5. Trigger Build
 
 The workflow will automatically run when you:
 
@@ -148,6 +156,12 @@ export API_KEY="your_api_key"
 ## Troubleshooting
 
 ### Common Issues
+
+**Workflow fails with exit code 128 or git push errors**
+
+- Ensure the repository allows GitHub Actions to write: Settings → Actions → General → Workflow permissions → "Read and write permissions"
+- Check that the workflow has `contents: write` permission (this is already configured)
+- Verify that the build actually generates files before attempting to commit
 
 **Workflow fails during "Validate secrets" step**
 

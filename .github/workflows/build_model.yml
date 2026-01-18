@@ -10,6 +10,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -51,23 +53,34 @@ jobs:
           if [ -f "${{ steps.build-deploy.outputs.deployment_file_name }}" ]; then
             echo "Extracting deployment..."
             mkdir -p temp
-            unzip -q "${{ steps.build-deploy.outputs.deployment_file_name }}" -d temp
-            # Move components to project structure
-            mkdir -p libs src models
-            if [ -d "temp/edge-impulse-sdk" ]; then
-              mv temp/edge-impulse-sdk libs/
+            if unzip -q "${{ steps.build-deploy.outputs.deployment_file_name }}" -d temp; then
+              echo "Extraction successful"
+              # Move components to project structure
+              mkdir -p libs src models
+              if [ -d "temp/edge-impulse-sdk" ]; then
+                mv temp/edge-impulse-sdk libs/
+                echo "Moved edge-impulse-sdk to libs/"
+              fi
+              if [ -d "temp/model-parameters" ]; then
+                mv temp/model-parameters src/
+                echo "Moved model-parameters to src/"
+              fi
+              if [ -d "temp/tflite-model" ]; then
+                mv temp/tflite-model/* models/ 2>/dev/null || true
+                echo "Moved tflite-model files to models/"
+              fi
+              # Clean up
+              rm -rf temp "${{ steps.build-deploy.outputs.deployment_file_name }}"
+              echo "Cleanup completed"
+            else
+              echo "Failed to extract deployment file"
+              ls -la "${{ steps.build-deploy.outputs.deployment_file_name }}"
+              exit 1
             fi
-            if [ -d "temp/model-parameters" ]; then
-              mv temp/model-parameters src/
-            fi
-            if [ -d "temp/tflite-model" ]; then
-              mv temp/tflite-model/* models/ 2>/dev/null || true
-            fi
-            # Clean up
-            rm -rf temp "${{ steps.build-deploy.outputs.deployment_file_name }}"
           else
             echo "No deployment file found"
             ls -la
+            exit 1
           fi
 
       - name: Update version file
@@ -79,8 +92,25 @@ jobs:
       - name: Commit generated files
         if: github.event_name == 'push'
         run: |
+          echo "Checking for generated files..."
+          ls -la libs/ src/ models/ version.txt 2>/dev/null || echo "Some files/directories not found"
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+
+          echo "Adding files to git..."
           git add -f libs/ src/ models/ version.txt || true
-          git commit -m "Auto-build: Update Edge Impulse model [skip ci]" || echo "No changes to commit"
-          git push
+
+          echo "Checking git status..."
+          git status --porcelain
+
+          # Check if there are changes to commit
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            echo "Committing changes..."
+            git commit -m "Auto-build: Update Edge Impulse model [skip ci]"
+            echo "Pushing changes..."
+            git push
+            echo "Push completed successfully"
+          fi
